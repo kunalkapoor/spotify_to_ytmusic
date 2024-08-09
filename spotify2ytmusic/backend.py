@@ -376,8 +376,11 @@ def copier(
     duplicate_count = 0
     error_count = 0
 
-    for src_track in src_tracks:
-        print(f"Spotify:   {src_track.title} - {src_track.artist} - {src_track.album}")
+    discrepancies = []
+    src_tracks_list = list(src_tracks)
+    src_tracks_len = len(src_tracks_list)
+    for index, src_track in enumerate(src_tracks_list, start=1):
+        print(f"[{index} / {src_tracks_len}] Spotify:   {src_track.title} - {src_track.artist} - {src_track.album}")
 
         try:
             dst_track = lookup_song(
@@ -386,6 +389,10 @@ def copier(
         except Exception as e:
             print(f"ERROR: Unable to look up song on YTMusic: {e}")
             error_count += 1
+            discrepancies.append({
+                "Spotify": f"{src_track.title} - {src_track.artist} - {src_track.album}",
+                "Youtube": f"Not found"
+            })
             continue
 
         yt_artist_name = "<Unknown>"
@@ -394,6 +401,13 @@ def copier(
         print(
             f"  Youtube: {dst_track['title']} - {yt_artist_name} - {dst_track['album'] if 'album' in dst_track else '<Unknown>'}"
         )
+
+        if str(src_track.title).lower()[:10] != str(dst_track['title']).lower()[:10] or str(src_track.artist).lower() != str(yt_artist_name).lower():
+            print(f"  WARNING: Track mismatch detected")
+            discrepancies.append({
+                "Spotify": f"{src_track.title} - {src_track.artist} - {src_track.album}",
+                "Youtube": f"{dst_track['title']} - {yt_artist_name} - {dst_track['album'] if 'album' in dst_track else '<Unknown>'}"
+            })
 
         if dst_track["videoId"] in tracks_added_set:
             print("(DUPLICATE, this track has already been added)")
@@ -422,6 +436,13 @@ def copier(
 
         if track_sleep:
             time.sleep(track_sleep)
+
+    print()
+    print("="*20)
+    print("Mismatched songs")
+    print("="*20)
+    for d in discrepancies:
+        print(f"- {d['Spotify']}\n  - {d['Youtube']}")
 
     print()
     print(
@@ -453,7 +474,7 @@ def copy_playlist(
         ytmusic_playlist_id = get_playlist_id_by_name(yt, pl_name)
         print(f"Looking up playlist '{pl_name}': id={ytmusic_playlist_id}")
 
-    if ytmusic_playlist_id is None:
+    if not ytmusic_playlist_id:
         if pl_name == "":
             print("No playlist name or ID provided, creating playlist...")
             spotify_pls: dict = load_playlists_json()
